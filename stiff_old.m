@@ -1,4 +1,4 @@
-function [K] = stiff_New(m,n,connect,k_vector)
+function [K] = stiff_New(m,n,connect,elas,e_area,e_len)
 %*************************************************************************
 %
 %           /====|    |=====|     |===|     |=====|    |=====|
@@ -25,41 +25,26 @@ function [K] = stiff_New(m,n,connect,k_vector)
 %
 %   Wen Luo
 %   5/16/2017
-%   Houlin Xu
-%   2/4/2024 modify K matrix to be sparse matrix for HPC
 %*************************************************************************
 %*************************************************************************
 %   total number of nodes
-tot_num_n = ( n + 1 ) * m / 2 + n / 2;
+    tot_num_n = ( n + 1 ) * m / 2 + n / 2;
 %   total number of elements
-tot_num_e = m * n;
+    tot_num_e = m * n;
 %   modulus multiplier
-
+    k0 = elas * e_area / e_len;
 %   initialize global stiffness matrix K
-%    K = zeros(tot_num_n);
-%   initialize the index
-i = zeros(4*tot_num_e,1);
-j = zeros(4*tot_num_e,1);
-s = zeros(4*tot_num_e,1);
-index = 0;
-
-%   local stiffness
-%   [k0 -k0
-%    -k0 k0]
+    K = zeros(tot_num_n);
 %   element loop
-
-
-for ii = 1:tot_num_e
-        k0 = k_vector(ii) *[1 -1;-1, 1];
-        for ti = 1:2
-            for tj = 1:2
-                index = index+1;
-                i(index) = connect(ii,ti);
-                j(index) = connect(ii,tj);
-                s(index) = k0(ti,tj);
-            end
-        end
+    for ii = 1:tot_num_e
+        % node number 1 of Ke (element stiffness)
+        n1 = connect(ii,1);
+        % node number 2 of Ke
+        n2 = connect(ii,2);
+        % update Ke: k0 * [1,-1;-1,1]
+        K(n1,n1) = K(n1,n1) + k0;
+        K(n1,n2) = K(n1,n2) - k0;
+        K(n2,n1) = K(n2,n1) - k0;
+        K(n2,n2) = K(n2,n2) + k0;
+    end
 end
-    K = sparse(i,j,s,tot_num_n,tot_num_n);
-end
-

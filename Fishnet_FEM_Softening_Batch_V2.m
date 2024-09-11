@@ -4,8 +4,8 @@
 clear
 %% parameter initialization
 % dimension
-m = 16;                              % number of nacre rows
-n = 16;                              % number of nacre colomns 
+m = 20;                              % number of nacre rows
+n = 20;                              % number of nacre colomns 
 num_e = m * n;                      % number of elements
 num_n = (n+1) * m/2 + n/2;          % number of nodes
 connect = conn(m,n);                % connectivity matrix
@@ -15,7 +15,7 @@ in_n = inner_node(b_n,connect,m,n); % internal node number vector
 n_1 = numel(b_n);                   % number of Dirichlet B.C nodes
 n_2 = num_n - n_1;                  % number of Neuman B.C nodes
 start_run = 1;                      % run number of starting simulation
-end_run = 1;                       % run number of finishing simulation
+end_run = 1000;                       % run number of finishing simulation
 num_run = end_run - start_run + 1;  % total number of runs
 
 % geometry
@@ -49,9 +49,16 @@ max_sig = zeros(num_run,1);
 h = waitbar(0,'Percent Completed:');
 
 % Initialization of stiffness matrix K
-K_0 = stiff_New(m,n,connect,elas,area,length);
-
-
+%tic
+% The original K assembly has been changed to sparse
+% matrix, the speed is two times faster now
+k_vector0 = stiff_ele(m,n,elas,area,length);
+K_0 = stiff_New(m,n,connect,k_vector0);
+%spy(K_0)
+%toc
+%tic
+%K_0_old = stiff_old(m,n,connect,elas,area,length);
+%toc
 for kk = 1:num_run
     %% variable initialization
     % loading
@@ -72,16 +79,19 @@ for kk = 1:num_run
     nominal_sig = zeros(n_damage*num_n+1,1);   
     
     % element stiffness history
-    k_vector = elas * area / length * ones(num_e,1);
+    % k_vector1 = elas * area / length * ones(num_e,1);
+    k_vector =  k_vector0;
     % link status
     status_lk = n_damage * ones(num_e,1);
     % link status history (run num. = 1 ONLY)
-    if num_run == 1
-        status_lk_his = zeros(num_e,num_e);
-        sig_his = zeros(num_e,num_e);
-        sig_max_his = zeros(2,num_e); 
-    end
-    
+    % if num_run == 1
+    %     status_lk_his = zeros(num_e,num_e);
+    %     sig_his = zeros(num_e,num_e);
+    %     sig_max_his = zeros(2,num_e); 
+    % end
+    status_lk_his = zeros(num_e,num_e);
+    sig_his = zeros(num_e,num_e);
+    sig_max_his = zeros(2,num_e); 
     %% random strength vector
 %    sig_rand = r_sig_W_thick(num_e);      % Weibull modulus 5, scale para 10
 %    sig_rand = r_sig_G(num_e,10,1);      % Gaussian N(10,2)
@@ -92,7 +102,7 @@ for kk = 1:num_run
 %sig_rand0 = r_sig_WG(num_e);
 %sig_rand = sig_rand0(257:512);
 
-srt_r = sort(sig_rand); 
+    srt_r = sort(sig_rand); 
 
     %% STEP LOOP
     for ii = 1: n_damage*num_e %num_e
@@ -105,9 +115,9 @@ srt_r = sort(sig_rand);
 
         % ratio of random strength over calculated stress
         ratio_sig = sig_strength./sig;
-        
+        %min(abs(ratio_sig))
         % break condition
-        if min(abs(ratio_sig)) > 1e3
+        if min(abs(ratio_sig)) > 1e4
             disp(ii+1) = u_1(end); 
             break; 
         end
@@ -159,8 +169,14 @@ srt_r = sort(sig_rand);
         stiff_old = k_vector(i_fail);
         sig_r = sig_strength(i_fail);
         sig_ori = sig_rand(i_fail);
+        %now the softening is not enabled
         stiff_new = stiff_residual(k0,sig_ori,sig_r,k_t);
+        %tic;
         K = stiff_Update_s(i_fail,K,connect,stiff_old,stiff_new);
+        % toc;
+%        tic;% this is not efficient using sparse manipulation
+%        K = stiff_Update_s_new(i_fail,K,n,m,connect,stiff_old,stiff_new);
+%        toc;
         k_vector(i_fail) = stiff_new;
         
         status_lk_his(:,ii) = status_lk;
@@ -195,8 +211,11 @@ srt_r = sort(sig_rand);
         
     end % end of step loop
 
-    
+
     ind_max = find(nominal_sig == max(nominal_sig));
+    % if (size(ind_max)~=1)
+    %     pause()
+    % end
     % peak nominal stress
     nom_strength(kk) = max(nominal_sig);
     max_sig(kk,1) = max(sig_his(:,ind_max));
@@ -236,7 +255,7 @@ srt_r = sort(sig_rand);
     
     % Progress
     progress = kk / num_run;
-    waitbar(progress)
+    waitbar(progress, h);
 end % end of batch loop
 close(h)
 % exectution time measurement END
@@ -244,13 +263,13 @@ toc;
 %%
 %BATCH output
 
-% if num_run > 1
-%     filename = '------FILE PATH-------';
-%     sheet = 'Sheet1';
-%     xlRange = 'A1';
-%     %xlswrite(filename,[disp,nominal_sig],sheet,xlRange)
-%     xlswrite(filename,nom_strength,sheet,xlRange);
-%     %save('Nacre_SE.mat','nominal_sig')
+if num_run > 1
+    filename = [ 'sqnom_strength_',num2str(m),'_',num2str(n),'_WG_uni0p51.csv'];
+    sheet = 'Sheet1';
+    xlRange = 'A1';
+    %xlswrite(filename,[disp,nominal_sig],sheet,xlRange)
+    xlswrite(filename,nom_strength,sheet,xlRange);
+    %save('Nacre_SE.mat','nominal_sig')
 %     
 %   
 %     filename = '------FILE PATH-------';
@@ -258,7 +277,7 @@ toc;
 %     xlRange = 'A1';
 %     xlswrite(filename,s_cluster,1,xlRange)
 % 
-% end
+end
 
 
 %% Single Realization Output
