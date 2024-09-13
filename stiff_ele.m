@@ -19,7 +19,7 @@ switch option
         % based, we take transpose
         k_vector = transpose(k_vector_0.* repmat(distribution',1,n));
     case 2
-        distribution2 = 0.5*ones(m,n);
+        distribution2 = 1*ones(m,n);
         distribution2(m/2,:) = 1;
         k_vector = transpose(k_vector_0.*distribution2);
 end

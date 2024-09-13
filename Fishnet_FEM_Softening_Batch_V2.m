@@ -4,8 +4,8 @@
 clear
 %% parameter initialization
 % dimension
-m = 20;                              % number of nacre rows
-n = 20;                              % number of nacre colomns 
+m = 10;                              % number of nacre rows
+n = 10;                              % number of nacre colomns 
 num_e = m * n;                      % number of elements
 num_n = (n+1) * m/2 + n/2;          % number of nodes
 connect = conn(m,n);                % connectivity matrix
@@ -15,7 +15,7 @@ in_n = inner_node(b_n,connect,m,n); % internal node number vector
 n_1 = numel(b_n);                   % number of Dirichlet B.C nodes
 n_2 = num_n - n_1;                  % number of Neuman B.C nodes
 start_run = 1;                      % run number of starting simulation
-end_run = 1000;                       % run number of finishing simulation
+end_run = 10000;                       % run number of finishing simulation
 num_run = end_run - start_run + 1;  % total number of runs
 
 % geometry
@@ -112,7 +112,10 @@ for kk = 1:num_run
         end
         % solve linear system
         [sig,f_1,u] = kernel_New(K,k_vector,connect,area,length,b_n,in_n,n_1,n_2,num_n,num_e,u_1);
-
+        %scale off-main line -- Weibull
+        %sig_strength([1:(m/2-1)*n, (m/2)*n+1:end]) = 0.1 * sig_strength([1:(m/2-1)*n, (m/2)*n+1:end]);
+        %scale off-main line -- Gaussian
+        sig_strength(n/2:n:end) = 0.1 * sig_strength(n/2:n:end);
         % ratio of random strength over calculated stress
         ratio_sig = sig_strength./sig;
         %min(abs(ratio_sig))
@@ -264,7 +267,7 @@ toc;
 %BATCH output
 
 if num_run > 1
-    filename = [ 'sqnom_strength_',num2str(m),'_',num2str(n),'_WG_uni0p51.csv'];
+    filename = [ 'sqnom_strength_',num2str(m),'_',num2str(n),'_WG_uni0p5.csv'];
     sheet = 'Sheet1';
     xlRange = 'A1';
     %xlswrite(filename,[disp,nominal_sig],sheet,xlRange)
@@ -345,17 +348,17 @@ end
 %     xlswrite(filename,[disp,nominal_sig],sheet,xlRange)
 
 %% post-processing (visualization)
-% stress level
+%stress level
 % for jj = 1:ii%find(nominal_sig==max(nominal_sig))
-%     if mod(jj,10) == 0
+%     if mod(jj,2) == 0
 %         plt_ele_scalar(sig_his,num_e,connect,coord,m,n,jj);
-%         pause(0.0001);
+%         pause(0.1);
 %         jj/ii
 %     end
 % end
 
 % damage level
-% for jj = 1:find(nominal_sig==max(nominal_sig))
+%for jj = 1:find(nominal_sig==max(nominal_sig))
 % for jj = 1: ii-1
 %     if mod(jj,10) == 0
 %         plt_ele_scalar(n_damage-status_lk_his,num_e,connect,coord,m,n,jj);
